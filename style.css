@@ -1,0 +1,24 @@
+ul #participants-list li
+ul #scoring li {
+        text-align: left;
+}
+
+.score {
+        background-color: 4078c0;
+}
+
+body {
+        width: 600px;
+        background-color: #ffffff;
+        padding: 10px;
+}
+
+.leftside {
+        float: left;
+        width: 60%;
+}
+
+.rightside {
+        float: left;
+}
+

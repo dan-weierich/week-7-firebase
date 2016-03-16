@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Rock Paper Scissors Firebase</title>
+<script src="https://cdn.firebase.com/js/client/2.4.1/firebase.js"></script>
+<script src="https://code.jquery.com/jquery-2.2.1.min.js"></script>
+<link rel='stylesheet' type='text/css' href='style.css'>
+</head>
+
+<body>
+
+<div class="leftside">
+    <div id="choice"></div>
+    <div id="participants">
+        <ul id="participant-list">
+        </ul>
+    </div>
+</div>
+<div class="rightside">
+    <ul id="scoring">
+    </ul>
+</div>
+
+<script type='text/javascript'>
+var players = 2;
+var firebase = "https://torrid-inferno-714.firebaseio.com"
+var location = 'player_list';
+var data = 'player_data';
+var scores = 'player_scores';
+function getMyUserId() {
+    return prompt('Your Name?', 'versus Guest');
+}
+function setRPS(myPlayerNumber, myUserId, myRPS) {
+    var playerDataRef = new Firebase(firebase).
+        child(data).child(myPlayerNumber);
+    playerDataRef.set({userId: myUserId, state: 'picked', rps: myRPS});
+}
+function gameWin(yourRPS, opponentRPS) {
+    switch(yourRPS) {
+    case 'rock':
+      switch(opponentRPS) {
+            case 'rock':
+                return 'draw';
+            case 'paper':
+                return 'lose';
+            case 'scissors':
+                return 'win';
+        }
+      break;
+    case 'paper':
+        switch(opponentRPS) {
+            case 'rock':
+                return 'win';
+            case 'paper':
+                return 'draw';
+            case 'scissors':
+                return 'lose';
+        }
+      break;
+    case 'scissors':
+        switch(opponentRPS) {
+            case 'rock':
+                return 'lose';
+            case 'paper':
+                return 'win';
+            case 'scissors':
+                return 'draw';
+        }
+        break;
+    }
+ }
+function playRPS(myPlayerNumber, myUserId) {
+  if (myPlayerNumber === null) {
+    alert('Game is full.  Can\'t join. :-(');
+  }
+  else {
+      $("#status").empty();
+      $("#scoreboard").empty();
+      $("#players-list").empty();
+      $("#status").css("display", "block");
+      $("#players").html("<ul id='players-list'"+
+          "style='list-style-type:none'></ul>");
+    var playerDataRef = new Firebase(firebase).
+        child(data).child(myPlayerNumber);
+    var allPlayersDataRef = new Firebase(firebase).
+        child(data);
+    var playerScoresRef = new Firebase(firebase).
+        child(scores);
+    var opponentPlayerNumber = myPlayerNumber === 0 ? 1 : 0;
+    playerScoresRef.on('value', function(snapshot) {
+      if (snapshot.val() === null) {
+        playerScoresRef.child(myUserId).set([0, 0]);
+      } else if (!(myUserId in snapshot.val())) {
+        playerScoresRef.child(myUserId).set([0, 0]);
+      }
+    });
+    playerDataRef.removeOnDisconnect();
+    playerDataRef.set({userId: myUserId, state: 'start', rps: 'none'});
+    $("#status").html("Waiting for second player...");
+    allPlayersDataRef.on('value', function(snapshot) {
+        if (snapshot.val().length === 2 &&
+        snapshot.val()[0].state === 'start' &&
+        snapshot.val()[1].state === 'start' ) {
+            $("#status").html("<input type='button' value='Rock' " +
+            "id='button_rock'" + "onclick='setRPS(" + myPlayerNumber +
+            ", \"" + myUserId + "\", \"rock\")'/>" +
+            "<input type='button' value='Paper' id='button_paper' onclick='setRPS(" +
+            myPlayerNumber + ", \"" + myUserId + "\", \"paper\")'/><input type='button'" +
+            "value='Scissors' id='button_scissors' onclick='setRPS(" + myPlayerNumber +
+            ", \"" + myUserId + "\", \"scissors\")'/>");
+        }
+    });
+    playerScoresRef.on('value', function(snapshot) {
+            $("#scoreboard").empty();
+           snapshot.forEach(function(childSnapshot) {
+            if(childSnapshot.name() === myUserId) {
+                $("#scoreboard").append("<li class='your-score'>" +
+                childSnapshot.name() + ": " + childSnapshot.val()[0]  + " wins, " +
+                childSnapshot.val()[1] + " losses</li>");
+            } else {
+                $("#scoreboard").append("<li>" + childSnapshot.name() +
+                ": " + childSnapshot.val()[0]  + " wins, " + childSnapshot.val()[1] +
+                " losses</li>");
+            }
+        });
+    });
+   allPlayersDataRef.on('child_changed', function(childSnapshot, prevChildName) {
+      allPlayersDataRef.once('value', function(nameSnapshot) {
+        var y = nameSnapshot.val();
+        var opponentPlayerNumber = myPlayerNumber === 0 ? 1 : 0;
+        var yourRPS = nameSnapshot.val()[myPlayerNumber].rps;
+        var opponentRPS = nameSnapshot.val()[opponentPlayerNumber].rps;
+
+        if(yourRPS !== 'none' && opponentRPS === 'none' &&
+        nameSnapshot.val()[myPlayerNumber].state === 'picked')  {
+            $("#status").css("display", "block");
+            $("#status").html("Waiting for second player to pick...");
+        }
+        if(y[0].rps !== 'none' && y[1].rps !== 'none') {
+            allPlayersDataRef.off('value', function(snapshot) {
+                if (snapshot.val().length === 2) {
+                    $("#status").empty();
+                    $("#status").append("<input type='button' " +
+                    "value='Rock' id='button_rock' onclick='setRPS(" +
+                    myPlayerNumber + ", \"" + myUserId +
+                    "\", \"rock\")'/><input type='button' value='Paper' " +
+                    "id='button_paper' onclick='setRPS(" +
+                    myPlayerNumber + ", \"" + myUserId +
+                    "\", \"paper\")'/><input type='button' value='Scissors' " +
+                    "id='button_scissors' onclick='setRPS(" + myPlayerNumber +
+                    ", \"" + myUserId +
+                    "\", \"scissors\")'/>");
+                }
+            });
+            $("#status").empty();
+            $("#players").html("<ul id='players-list' style='list-style-type:none'></ul>");
+            $("#players-list").append("<li>You picked: " + yourRPS + "</li>");
+            $("#players-list").append("<li>" +
+            nameSnapshot.val()[opponentPlayerNumber].userId +
+            " picked: " + opponentRPS + "</li>");
+            $("#players-list").append("<li>You " + gameWin(yourRPS, opponentRPS) + "!");
+            $("#scoreboard").empty();
+            playerScoresRef.once('value', function(snapshot) {
+                snapshot.forEach(function(childSnapshot) {
+                    if(childSnapshot.name() === myUserId) {
+                        $("#scoreboard").append("<li class='your-score'>" +
+                        childSnapshot.name() + ": " + childSnapshot.val()[0]  +
+                        " wins, " + childSnapshot.val()[1] + " losses</li>");
+                    } else {
+                        $("#scoreboard").append("<li>" + childSnapshot.name() +
+                        ": " + childSnapshot.val()[0]  + " wins, " +
+                        childSnapshot.val()[1] + " losses</li>");
+                    }
+                });
+            });
+            var currentWins,
+                currentLosses;
+            if (nameSnapshot.val()[myPlayerNumber].state === 'picked') {
+                playerScoresRef.child(myUserId).on('value', function(snapshot) {
+                  currentWins = snapshot.val()[0];
+                  currentLosses = snapshot.val()[1];
+                });
+                if(gameWin(yourRPS, opponentRPS) === 'win') {
+                    playerScoresRef.child(myUserId).set([currentWins + 1, currentLosses]);
+                } else if (gameWin(yourRPS, opponentRPS) === 'lose') {
+                    playerScoresRef.child(myUserId).set([currentWins, currentLosses + 1]);
+                }
+            }
+            $("#players-list").append("<input type='button' value='Play Again' " +
+            "id='button_restart' onclick='playRPS
+        (" + myPlayerNumber +
+            ", \"" + myUserId + "\")'/>");
+            playerDataRef.set({userId: myUserId, state: 'finished', rps: yourRPS});
+        }
+      });
+    });
+  }
+}
+function playingRPS() {
+  var myUserId = getMyUserId();
+  var playerListRef = new Firebase(firebase).
+      child(location);
+    playerListRef.transaction(function(playerList) {
+    var i;
+    if (playerList === null) {
+      playerList = {};
+    }
+    var joinedGame = false;
+    for(i = 0; i < players; i++) {
+      if (playerList[i] === myUserId) {
+          alert("Already in the game.");
+        return;       }
+      else if (!(i in playerList) && !joinedGame) {
+                playerList[i] = myUserId;
+        joinedGame = true;
+        break;
+      }
+    }
+    if (joinedGame) {
+      return playerList;
+    }
+  }, function (success, transactionResultSnapshot) {
+    var myPlayerNumber = null,
+        resultPlayerList = transactionResultSnapshot.val();
+    for(var i = 0; i < players; i++) {
+      if (resultPlayerList[i] === myUserId) {
+        myPlayerNumber = i;
+        break;
+      }
+    }
+    playerListRef.child(myPlayerNumber).removeOnDisconnect();
+    playRPS
+(myPlayerNumber, myUserId);
+  });
+}
+playingRPS();
+</script>
+</body>
+</html>
